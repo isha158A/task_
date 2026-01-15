@@ -1,0 +1,180 @@
+"""
+=========================================================
+Assignment: Website-Aware Chatbot using ChatGPT API
+Language: Python
+Mode: Console-based (No frontend)
+=========================================================
+
+ABOUT THIS PROJECT (In Simple Words):
+
+This project creates a chatbot that can answer questions
+based on the content of a given website.
+
+Since ChatGPT cannot directly visit websites, we first:
+1. Download the website content
+2. Extract readable text from it
+3. Give that text to ChatGPT as context
+4. Let users ask questions via the console
+
+---------------------------------------------------------
+
+STEP-BY-STEP PROCESS FOLLOWED:
+
+1. Environment Setup
+   - Installed required libraries:
+     * requests        → Downloads website HTML
+     * beautifulsoup4  → Extracts readable text from HTML
+     * openai          → Communicates with ChatGPT API
+   - Generated an OpenAI API key and stored it safely
+     as an environment variable.
+
+2. Website Data Extraction
+   - Used requests to fetch website HTML.
+   - Used BeautifulSoup to parse HTML structure.
+   - Removed scripts, styles, and unnecessary elements.
+   - Extracted clean, readable text only.
+
+3. Data Processing
+   - Removed extra spaces and line breaks.
+   - Limited text length to avoid token overflow.
+   - Stored cleaned website text as chatbot knowledge.
+
+4. Chatbot Implementation
+   - Used ChatGPT API to generate responses.
+   - Website content is provided as system context.
+   - User questions are answered only using that content.
+
+5. Console Demonstration
+   - Chatbot runs in terminal/console.
+   - User can type questions and get responses.
+   - Typing 'exit' ends the program.
+
+=========================================================
+"""
+
+import os
+import requests
+from bs4 import BeautifulSoup
+from openai import OpenAI
+
+# CONFIGURATION SECTION
+
+
+# Website from which the chatbot will learn
+WEBSITE_URL = "https://botpenguin.com/"
+
+# Lightweight and cost-efficient ChatGPT model
+MODEL_NAME = "gpt-4.1-mini"
+
+
+# -------------------------------------------------------
+# STEP 1: Initialize OpenAI Client
+# -------------------------------------------------------
+# This client is used to communicate with the ChatGPT API.
+# The API key is securely loaded from an environment variable.
+
+client = OpenAI(
+    api_key=os.getenv("OPENAI_API_KEY")
+)
+
+
+# STEP 2: Scrape Website Content
+
+
+def scrape_website(url):
+    """
+    Downloads a website and extracts readable text.
+
+    What this function does:
+    - Sends a request to the website
+    - Parses the HTML using BeautifulSoup
+    - Removes scripts and styles
+    - Returns clean, readable text
+    """
+
+    # Fetch website HTML
+    response = requests.get(url, timeout=10)
+    response.raise_for_status()
+
+    # Parse HTML content
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    # Remove unwanted elements (JS, CSS, etc.)
+    for tag in soup(["script", "style", "noscript"]):
+        tag.decompose()
+
+    # Extract visible text
+    text = soup.get_text(separator=" ")
+
+    # Clean extra spaces and line breaks
+    cleaned_text = " ".join(text.split())
+
+    # Limit size to avoid exceeding API limits
+    return cleaned_text[:6000]
+
+# STEP 3: Chatbot Logic
+
+
+def chatbot_response(user_input, website_context):
+    """
+    Sends user questions and website context to ChatGPT
+    and returns a meaningful response.
+    """
+
+    response = client.responses.create(
+        model=MODEL_NAME,
+        input=[
+            {
+                "role": "system",
+                "content": (
+                    "You are a helpful assistant. "
+                    "Answer questions strictly using the website content provided."
+                )
+            },
+            {
+                "role": "system",
+                "content": f"Website Content: {website_context}"
+            },
+            {
+                "role": "user",
+                "content": user_input
+            }
+        ]
+    )
+
+    return response.output_text
+
+
+# STEP 4: Console-Based Chat Interface
+
+
+def run_chatbot():
+    """
+    Runs the chatbot in the console.
+    Allows users to ask questions until they type 'exit'.
+    """
+
+    print("\nWebsite Chatbot Initialized")
+    print("Source Website:", WEBSITE_URL)
+    print("Type 'exit' to quit.\n")
+
+    # Scrape website once at startup
+    website_content = scrape_website(WEBSITE_URL)
+
+    while True:
+        user_input = input("You: ")
+
+        if user_input.lower() == "exit":
+            print("Chatbot: Goodbye!")
+            break
+
+        answer = chatbot_response(user_input, website_content)
+        print("\nChatbot:", answer, "\n")
+
+
+
+# STEP 5: Program Entry Point
+
+
+if __name__ == "__main__":
+    run_chatbot()
